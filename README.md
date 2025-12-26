@@ -351,23 +351,23 @@ bytecode is generated in one pass with several tricks to optimize it
 ## Tests and benchmarks
 
 Running the basic tests:
-``sh
+```sh
 make test
-``
+```
 
 Running the QuickJS micro benchmark:
-``sh
+```sh
 make microbench
-``
+```
 
 Addtional tests and a patched version of the Octane benchmark running
 in stricter mode can be downloaded
 [here](https://bellard.org/mquickjs/mquickjs-extras.tar.xz):
 
 Running the V8 octane benchmark:
-``sh
+```sh
 make octane
-``
+```
 
 ## License
 
