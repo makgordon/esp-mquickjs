@@ -15130,6 +15130,8 @@ JSValue js_typed_array_constructor(JSContext *ctx, JSValue *this_val,
         if (JS_ToIndex(ctx, &len, argv[0]))
             return JS_EXCEPTION;
         buffer = js_array_buffer_alloc(ctx, len << size_log2);
+        if (JS_IsException(buffer))
+            return JS_EXCEPTION;
         offset = 0;
     } else {
         p = JS_VALUE_TO_PTR(argv[0]);
