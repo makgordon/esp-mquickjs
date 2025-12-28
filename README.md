@@ -1,5 +1,18 @@
-MicroQuickJS
+ESP-MicroQuickJS
 ============
+
+## Overview
+**ESP-MQuickJS** is a port of the [MicroQuickJS](https://bellard.org/mquickjs/) (mquickjs) Javascript engine to the **Espressif ESP-IDF** platform. 
+
+MicroQuickJS is a tiny Javascript engine designed for embedded systems, capable of running with as little as **10 kB of RAM** and roughly 100 kB of ROM. This project packages it as an **ESP-IDF Component**, making it easy to integrate lightweight Javascript scripting capabilities into your ESP32, ESP32-C3, ESP32-S3, and other ESP-IDF based projects.
+
+### Key Features
+*   **ESP-IDF Component Support**: Ready to be used with the IDF Component Manager or as a submodule.
+*   **Extremely Low Footprint**: Ideal for resource-constrained ESP chips.
+*   **ES5 Subset**: Supports a strict subset of ES5, optimized for reliability and size.
+*   **Native Integration**: (Planned/Implemented) Easy binding between C functions and Javascript.
+
+*This project is based on the original work by Fabrice Bellard and Charlie Gordon.*
 
 ## Introduction
 
