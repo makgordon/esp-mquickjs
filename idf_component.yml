@@ -4,11 +4,10 @@ url: "https://github.com/makgordon/esp-mquickjs"
 issues: "https://github.com/makgordon/esp-mquickjs/issues"
 documentation: "https://github.com/makgordon/esp-mquickjs/blob/main/README.md"
 repository: "https://github.com/makgordon/esp-mquickjs.git"
-keywords:
+tags:
   - mquickjs
   - javascript
   - interpreter
-  - engine
 dependencies:
   idf:
     version: ">=5.0"
