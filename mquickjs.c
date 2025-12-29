@@ -1429,7 +1429,7 @@ static __maybe_unused void dump_string_pos_cache(JSContext *ctx)
             printf("<empty>\n");
         } else {
             JSString *p = JS_VALUE_TO_PTR(ce->str);
-            printf(" utf8_pos=%lu/%u utf16_pos=%lu\n",
+            printf(" utf8_pos=%" PRIu32 "/%u utf16_pos=%" PRIu32 "\n",
                    ce->str_pos[POS_TYPE_UTF8], (int)p->len, ce->str_pos[POS_TYPE_UTF16]);
         }
     }
@@ -6742,11 +6742,11 @@ static void js_dump_object(JSContext *ctx, JSObject *p, int flags)
                     case JS_CLASS_INT32_ARRAY:
                         v = *((int32_t *)arr->buf + idx);
                     ta_i32:
-                        js_printf(ctx, "%ld", v);
+                        js_printf(ctx, "%" PRId32, v);
                         break;
                     case JS_CLASS_UINT32_ARRAY:
                         v = *((uint32_t *)arr->buf + idx);
-                        js_printf(ctx, "%lu", v);
+                        js_printf(ctx, "%" PRIu32, v);
                         break;
                     case JS_CLASS_FLOAT32_ARRAY:
                         d = *((float *)arr->buf + idx);
@@ -7043,7 +7043,7 @@ void JS_DumpMemory(JSContext *ctx, BOOL is_long)
             if (mtag != JS_MTAG_FREE) {
                 if (mtag == JS_MTAG_OBJECT) {
                     JSObject *p = (JSObject *)ptr;
-                    js_printf(ctx, " 0x%08lx 0x%08lx",
+                    js_printf(ctx, " 0x%08" PRIx32 " 0x%08" PRIx32,
                               val_to_offset(ctx, p->proto), val_to_offset(ctx, p->props));
                 } else {
                     js_printf(ctx, " %10s %10s", "", "");
@@ -11236,7 +11236,7 @@ static void compute_stack_size_push(JSParseState *s,
     js_printf(s->ctx, "%5d: %d\n", pos, stack_len);
 #endif
     if (pos >= (uint32_t)arr->size)
-        js_parse_error(s, "bytecode buffer overflow (pc=%ld)", pos);
+        js_parse_error(s, "bytecode buffer overflow (pc=%" PRId32 ")", pos);
     /* XXX: could avoid the division */
     short_stack_len = 1 + ((unsigned)stack_len % 255);
     if (explore_tab[pos] != 0) {
