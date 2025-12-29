@@ -1,4 +1,4 @@
-version: "0.1.0"
+version: "0.1.0-alpha"
 description: "A port of MicroQuickJS (aka. MQuickJS for embedded systems) to the ESP-IDF platform."
 url: "https://github.com/makgordon/esp-mquickjs"
 issues: "https://github.com/makgordon/esp-mquickjs/issues"
@@ -11,3 +11,5 @@ tags:
 dependencies:
   idf:
     version: ">=5.0"
+files:
+  use_gitignore: true
