@@ -64,6 +64,7 @@
 #define JS_MIN_CRITICAL_FREE_SIZE (JS_MIN_FREE_SIZE - 256)
 #define JS_MAX_LOCAL_VARS 65535
 #define JS_MAX_FUNC_STACK_SIZE 65535
+#define JS_MAX_ARGC 65535
 /* maximum number of recursing JS_Call() */
 #define JS_MAX_CALL_RECURSE 8
 
@@ -9572,7 +9573,7 @@ static int js_parse_postfix_expr(JSParseState *s, int state, int parse_flags)
             arg_count = 0;
             if (s->token.val != ')') {
                 for(;;) {
-                    if (arg_count >= 65535)
+                    if (arg_count >= JS_MAX_ARGC)
                         js_parse_error(s, "too many call arguments");
                     arg_count++;
                     PARSE_CALL_SAVE5(s, 5, js_parse_assign_expr, 0,
@@ -13125,6 +13126,8 @@ JSValue js_function_apply(JSContext *ctx, JSValue *this_val,
         return JS_ThrowTypeError(ctx, "not an array");
     arr = JS_VALUE_TO_PTR(p->u.array.tab);
     len = p->u.array.len;
+    if (len > JS_MAX_ARGC)
+        return JS_ThrowTypeError(ctx, "too many call arguments");
     if (JS_StackCheck(ctx, len + 2))
         return JS_EXCEPTION;
     p = JS_VALUE_TO_PTR(argv[1]);
@@ -13161,7 +13164,7 @@ JSValue js_function_bound(JSContext *ctx, JSValue *this_val,
 {
     JSValueArray *arr;
     JSGCRef params_ref;
-    int i, err, size;
+    int i, err, size, argc2;
     
     arr = JS_VALUE_TO_PTR(params);
     size = arr->size;
@@ -13170,6 +13173,9 @@ JSValue js_function_bound(JSContext *ctx, JSValue *this_val,
     JS_POP_VALUE(ctx, params);
     if (err)
         return JS_EXCEPTION;
+    argc2 = size - 2 + argc;
+    if (argc2 > JS_MAX_ARGC)
+        return JS_ThrowTypeError(ctx, "too many call arguments");
     arr = JS_VALUE_TO_PTR(params);
     for(i = argc - 1; i >= 0; i--)
         JS_PushArg(ctx, argv[i]);
@@ -13179,7 +13185,7 @@ JSValue js_function_bound(JSContext *ctx, JSValue *this_val,
     JS_PushArg(ctx, arr->arr[0]); /* func */
     JS_PushArg(ctx, arr->arr[1]); /* this_val */
     /* we avoid recursing on the C stack */
-    return JS_NewTailCall(size - 2 + argc);
+    return JS_NewTailCall(argc2);
 }
 
 /**********************************************************************/
