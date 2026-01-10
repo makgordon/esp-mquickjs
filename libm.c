@@ -526,7 +526,7 @@ double js_scalbn(double x, int n)
  *---------------
  */
 
-#if defined(__aarch64__) || defined(__x86_64__) || defined(__i386__)
+#if defined(__aarch64__) || defined(__x86_64__) || defined(__i386__) || defined(ESP_PLATFORM)
 /* hardware sqrt is available */
 double js_sqrt(double x)
 {
