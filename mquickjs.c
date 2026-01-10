@@ -1588,6 +1588,8 @@ typedef struct {
 } StringBuffer;
 
 /* return 0 if OK, -1 in case of exception (exception possible if len > 0) */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdangling-pointer"
 static int string_buffer_push(JSContext *ctx, StringBuffer *s, int len)
 {
     s->len = 0;
@@ -1605,6 +1607,7 @@ static int string_buffer_push(JSContext *ctx, StringBuffer *s, int len)
     ctx->top_gc_ref = &s->buffer_ref;
     return 0;
 }
+#pragma GCC diagnostic pop
 
 /* val2 must be a string. Return 0 if OK, -1 in case of exception */
 static int string_buffer_concat_str(JSContext *ctx, StringBuffer *s, JSValue val2)
