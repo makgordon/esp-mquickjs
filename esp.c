@@ -91,7 +91,7 @@ void esp_mqjs_run_script(const char *script)
     JSContext *ctx;
     JSValue val;
 
-    mem_size = 10 * 1024; // 10KB; // TODO: Kconfig option, test running in PSRAM
+    mem_size = 16 * 1024; // 16KB; // TODO: Kconfig option, test running in PSRAM
     mem_buf = malloc(mem_size);
     if (!mem_buf) {
         ESP_LOGE(TAG, "Failed to allocate memory");
