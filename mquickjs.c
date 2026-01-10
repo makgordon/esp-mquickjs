@@ -8712,7 +8712,7 @@ static int cpool_add(JSParseState *s, JSValue val)
             return i;
     }
 
-    if (s->cpool_len > 65535)
+    if (s->cpool_len >= 65535)
         js_parse_error(s, "too many constants");
     JS_PUSH_VALUE(s->ctx, val);
     new_cpool = js_resize_value_array(s->ctx, b->cpool, max_int(s->cpool_len + 1, 4));

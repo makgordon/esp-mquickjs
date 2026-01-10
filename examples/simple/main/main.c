@@ -1,19 +1,9 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/time.h>
-#include <time.h>
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-
 #include "esp_log.h"
 
-#include "mquickjs.h"
+#include "esp_mqjs.h"
 
 static const char *TAG = "example";
 
-const size_t JS_MEMORY_SIZE = 10 * 1024; // 10KB
 const char *script = 
     "/* Mandelbrot set */\n"
     "function mandelbrot(center_x, center_y, scale, w, h, max_it) {\n"
@@ -50,114 +40,9 @@ const char *script =
     "mandelbrot(-0.75, 0.0, 2.0, 80, 25, 50);\n"
     "print('Time: ' + (Date.now() - start) + 'ms');\n";
 
-// Helper for time functions
-static int64_t get_time_ms(void)
-{
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return (int64_t)tv.tv_sec * 1000 + (tv.tv_usec / 1000);
-}
-
-static int js_interrupt_handler(JSContext *ctx, void *opaque)
-{
-    static int64_t last_time = 0;
-    int64_t cur_time = get_time_ms();
-    // Yield every 100ms to let the IDLE task run and reset the watchdog
-    if (cur_time - last_time > 100) {
-        vTaskDelay(1); 
-        last_time = cur_time;
-    }
-    return 0;
-}
-
-// -------------------------------------------------------------------------
-// JS Function Definitions required by mqjs_stdlib.h
-// These must be defined BEFORE including "mqjs_stdlib.h"
-// -------------------------------------------------------------------------
-
-static JSValue js_print(JSContext *ctx, JSValue *this_val, int argc, JSValue *argv)
-{
-    int i;
-    JSValue v;
-    
-    for(i = 0; i < argc; i++) {
-        if (i != 0)
-            putchar(' ');
-        v = argv[i];
-        if (JS_IsString(ctx, v)) {
-            JSCStringBuf buf;
-            const char *str;
-            size_t len;
-            str = JS_ToCStringLen(ctx, &len, v, &buf);
-            fwrite(str, 1, len, stdout);
-        } else {
-            JS_PrintValueF(ctx, argv[i], JS_DUMP_LONG);
-        }
-    }
-    putchar('\n');
-    return JS_UNDEFINED;
-}
-
-static JSValue js_date_now(JSContext *ctx, JSValue *this_val, int argc, JSValue *argv)
-{
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return JS_NewInt64(ctx, (int64_t)tv.tv_sec * 1000 + (tv.tv_usec / 1000));
-}
-
-static JSValue js_performance_now(JSContext *ctx, JSValue *this_val, int argc, JSValue *argv)
-{
-    return JS_NewInt64(ctx, get_time_ms());
-}
-
-static JSValue js_gc(JSContext *ctx, JSValue *this_val, int argc, JSValue *argv)
-{
-    JS_GC(ctx);
-    return JS_UNDEFINED;
-}
-
-static JSValue js_load(JSContext *ctx, JSValue *this_val, int argc, JSValue *argv) { return JS_UNDEFINED; }
-static JSValue js_setTimeout(JSContext *ctx, JSValue *this_val, int argc, JSValue *argv) { return JS_UNDEFINED; }
-static JSValue js_clearTimeout(JSContext *ctx, JSValue *this_val, int argc, JSValue *argv) { return JS_UNDEFINED; }
-
-// -------------------------------------------------------------------------
-// Include the standard library definition
-// -------------------------------------------------------------------------
-#include "mqjs_stdlib.h"
-
-// -------------------------------------------------------------------------
-// Main Application
-// -------------------------------------------------------------------------
-
-static void js_log_func(void *opaque, const void *buf, size_t buf_len)
-{
-    fwrite(buf, 1, buf_len, stdout);
-}
-
 void app_main(void)
 {
-    uint8_t *mem_buf;
-    JSContext *ctx;
-    JSValue val;
-
-    mem_buf = malloc(JS_MEMORY_SIZE);
-    if (!mem_buf) {
-        ESP_LOGE(TAG, "Failed to allocate memory");
-        return;
-    }
-
-    ctx = JS_NewContext(mem_buf, JS_MEMORY_SIZE, &js_stdlib);
-    JS_SetLogFunc(ctx, js_log_func);
-    JS_SetInterruptHandler(ctx, js_interrupt_handler);
-
-    val = JS_Eval(ctx, script, strlen(script), "<input>", 0);
-    if (JS_IsException(val)) {
-        JSValue obj = JS_GetException(ctx);
-        JS_PrintValueF(ctx, obj, JS_DUMP_LONG);
-        printf("\n");
-    }
-    ESP_LOGI(TAG, "Script executed successfully.");
-
-    JS_FreeContext(ctx);
-    free(mem_buf);
+    ESP_LOGI(TAG, "Starting JavaScript runtime...");
+    
+    esp_mqjs_run_script(script);
 }

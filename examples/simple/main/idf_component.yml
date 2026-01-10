@@ -3,5 +3,5 @@ version: "1.0.0"
 dependencies:
   idf: ">=5.0"
   makgordon/esp-mquickjs:
-    version: "0.*"
+    version: ">=0.2.0"
     override_path: "../../../"
