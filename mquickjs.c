@@ -3655,11 +3655,12 @@ JSContext *JS_NewContext(void *mem_start, size_t mem_size, const JSSTDLibraryDef
 
 void JS_FreeContext(JSContext *ctx)
 {
-    /* call the user C finalizers */
     uint8_t *ptr;
     int size;
     JSObject *p;
     
+    /* call the user C finalizers */
+    /* XXX: could disable it when prepare_compilation = true */
     ptr = ctx->heap_base;
     while (ptr < ctx->heap_free) {
         size = get_mblock_size(ptr);
@@ -12839,6 +12840,8 @@ int JS_PrepareBytecode64to32(JSContext *ctx,
 
     *pdata_buf = ctx->heap_base;
     *pdata_len = ctx->heap_free - ctx->heap_base;
+    /* ensure that JS_FreeContext() will do nothing */
+    ctx->heap_free = ctx->heap_base; 
     return 0;
 }
 #endif /* JSW == 8 */
@@ -13597,7 +13600,8 @@ JSValue js_string_toLowerCase(JSContext *ctx, JSValue *this_val,
     if (JS_IsException(*this_val))
         return *this_val;
     len = js_string_len(ctx, *this_val);
-    string_buffer_push(ctx, b, len);
+    if (string_buffer_push(ctx, b, len))
+        return JS_EXCEPTION;
     for(i = 0; i < len; i++) {
         c = string_getc(ctx, *this_val, i);
         if (to_lower) {
