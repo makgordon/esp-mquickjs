@@ -207,10 +207,13 @@ JS_BOOL JS_IsNumber(JSContext *ctx, JSValue val);
 JS_BOOL JS_IsString(JSContext *ctx, JSValue val);
 JS_BOOL JS_IsError(JSContext *ctx, JSValue val);
 JS_BOOL JS_IsFunction(JSContext *ctx, JSValue val);
+JS_BOOL JS_IsArray(JSContext *ctx, JSValue obj);
 
 int JS_GetClassID(JSContext *ctx, JSValue val);
 void JS_SetOpaque(JSContext *ctx, JSValue val, void *opaque);
 void *JS_GetOpaque(JSContext *ctx, JSValue val);
+void JS_SetUserValue(JSContext *ctx, JSValue obj, uint32_t idx, JSValue val);
+JSValue JS_GetUserValue(JSContext *ctx, JSValue obj, uint32_t idx);
 
 typedef JSValue JSCFunction(JSContext *ctx, JSValue *this_val, int argc, JSValue *argv);
 /* no JS function call be called from a C finalizer */
@@ -264,6 +267,7 @@ JSContext *JS_NewContext(void *mem_start, size_t mem_size, const JSSTDLibraryDef
 JSContext *JS_NewContext2(void *mem_start, size_t mem_size, const JSSTDLibraryDef *stdlib_def, JS_BOOL prepare_compilation);
 void JS_FreeContext(JSContext *ctx);
 void JS_SetContextOpaque(JSContext *ctx, void *opaque);
+void *JS_GetContextOpaque(JSContext *ctx);
 void JS_SetInterruptHandler(JSContext *ctx, JSInterruptHandler *interrupt_handler);
 void JS_SetRandomSeed(JSContext *ctx, uint64_t seed);
 JSValue JS_GetGlobalObject(JSContext *ctx);
@@ -282,11 +286,12 @@ JSValue JS_SetPropertyStr(JSContext *ctx, JSValue this_obj,
                           const char *str, JSValue val);
 JSValue JS_SetPropertyUint32(JSContext *ctx, JSValue this_obj,
                              uint32_t idx, JSValue val);
-JSValue JS_NewObjectClassUser(JSContext *ctx, int class_id);
+JSValue JS_NewObjectClassUser(JSContext *ctx, int class_id, uint32_t n_values);
 JSValue JS_NewObject(JSContext *ctx);
 JSValue JS_NewArray(JSContext *ctx, int initial_len);
 /* create a C function with an object parameter (closure) */
 JSValue JS_NewCFunctionParams(JSContext *ctx, int func_idx, JSValue params);
+JSValue JS_NewDate(JSContext *ctx, double epoch_ms);
 
 #define JS_EVAL_RETVAL    (1 << 0) /* return the last value instead of undefined (slower code) */
 #define JS_EVAL_REPL      (1 << 1) /* implicitly defined global variables in assignments */
@@ -310,6 +315,7 @@ int JS_ToUint32(JSContext *ctx, uint32_t *pres, JSValue val);
 int JS_ToInt32Sat(JSContext *ctx, int *pres, JSValue val);
 int JS_ToNumber(JSContext *ctx, double *pres, JSValue val);
 
+JS_BOOL JS_HasException(JSContext *ctx);
 JSValue JS_GetException(JSContext *ctx);
 int JS_StackCheck(JSContext *ctx, uint32_t len);
 void JS_PushArg(JSContext *ctx, JSValue val);

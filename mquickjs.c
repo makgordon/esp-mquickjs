@@ -313,8 +313,17 @@ typedef struct {
     int last_index;
 } JSRegExp;
 
+typedef struct
+#ifndef JS_PTR64
+__attribute__((packed)) /* unaligned 64 bit access in 32-bit mode */
+#endif
+{
+    double dval;
+} JSDate;
+
 typedef struct {
     void *opaque;
+    JSValue values[];
 } JSObjectUserData;
 
 struct JSObject {
@@ -339,6 +348,7 @@ struct JSObject {
         JSArrayBuffer array_buffer;
         JSTypedArray typed_array;
         JSRegExp regexp;
+        JSDate date;
         JSObjectUserData user;
     } u;
 };
@@ -1117,24 +1127,46 @@ int JS_GetClassID(JSContext *ctx, JSValue val)
     }
 }
 
-void JS_SetOpaque(JSContext *ctx, JSValue val, void *opaque)
+void JS_SetOpaque(JSContext *ctx, JSValue obj, void *opaque)
 {
     JSObject *p;
-    assert(JS_IsPtr(val));
-    p = JS_VALUE_TO_PTR(val);
+    assert(JS_IsPtr(obj));
+    p = JS_VALUE_TO_PTR(obj);
     assert(p->mtag == JS_MTAG_OBJECT);
     assert(p->class_id >= JS_CLASS_USER);
     p->u.user.opaque = opaque;
 }
 
-void *JS_GetOpaque(JSContext *ctx, JSValue val)
+void *JS_GetOpaque(JSContext *ctx, JSValue obj)
 {
     JSObject *p;
-    assert(JS_IsPtr(val));
-    p = JS_VALUE_TO_PTR(val);
+    assert(JS_IsPtr(obj));
+    p = JS_VALUE_TO_PTR(obj);
     assert(p->mtag == JS_MTAG_OBJECT);
     assert(p->class_id >= JS_CLASS_USER);
     return p->u.user.opaque;
+}
+
+void JS_SetUserValue(JSContext *ctx, JSValue obj, uint32_t idx, JSValue val)
+{
+    JSObject *p;
+    assert(JS_IsPtr(obj));
+    p = JS_VALUE_TO_PTR(obj);
+    assert(p->mtag == JS_MTAG_OBJECT);
+    assert(p->class_id >= JS_CLASS_USER);
+    assert((idx + 1) < p->extra_size);
+    p->u.user.values[idx] = val;
+}
+
+JSValue JS_GetUserValue(JSContext *ctx, JSValue obj, uint32_t idx)
+{
+    JSObject *p;
+    assert(JS_IsPtr(obj));
+    p = JS_VALUE_TO_PTR(obj);
+    assert(p->mtag == JS_MTAG_OBJECT);
+    assert(p->class_id >= JS_CLASS_USER);
+    assert((idx + 1) < p->extra_size);
+    return p->u.user.values[idx];
 }
 
 static JSObject *js_get_object_class(JSContext *ctx, JSValue val, int class_id)
@@ -2116,11 +2148,16 @@ const char *JS_ToCString(JSContext *ctx, JSValue val, JSCStringBuf *buf)
     return JS_ToCStringLen(ctx, NULL, val, buf);
 }
 
+BOOL JS_HasException(JSContext *ctx)
+{
+    return !JS_IsUninitialized(ctx->current_exception);
+}
+
 JSValue JS_GetException(JSContext *ctx)
 {
     JSValue obj;
     obj = ctx->current_exception;
-    ctx->current_exception = JS_UNDEFINED;
+    ctx->current_exception = JS_UNINITIALIZED;
     return obj;
 }
 
@@ -2373,15 +2410,19 @@ static JSValue JS_NewObjectClass(JSContext *ctx, int class_id, int extra_size)
     return JS_NewObjectProtoClass(ctx, ctx->class_proto[class_id], class_id, extra_size);
 }
 
-JSValue JS_NewObjectClassUser(JSContext *ctx, int class_id)
+JSValue JS_NewObjectClassUser(JSContext *ctx, int class_id, uint32_t n_values)
 {
     JSObject *p;
+    uint32_t i;
     assert(class_id >= JS_CLASS_USER);
+    assert(n_values <= 254); /* arbitrary but limited by the bit width of extra_size */
     p = JS_NewObjectProtoClass1(ctx, ctx->class_proto[class_id], class_id,
-                                sizeof(JSObjectUserData));
+                                sizeof(JSObjectUserData) + n_values * sizeof(JSValue));
     if (!p)
         return JS_EXCEPTION;
     p->u.user.opaque = NULL;
+    for(i = 0; i < n_values; i++)
+        p->u.user.values[i] = JS_UNDEFINED;
     return JS_VALUE_FROM_PTR(p);
 }
 
@@ -3613,7 +3654,7 @@ JSContext *JS_NewContext2(void *mem_start, size_t mem_size, const JSSTDLibraryDe
     }
     
     
-    ctx->current_exception = JS_UNDEFINED;
+    ctx->current_exception = JS_UNINITIALIZED;
 #ifdef DEBUG_GC
     /* set the dummy block at the start of the memory */
     {
@@ -3676,6 +3717,11 @@ void JS_FreeContext(JSContext *ctx)
 void JS_SetContextOpaque(JSContext *ctx, void *opaque)
 {
     ctx->opaque = opaque;
+}
+
+void *JS_GetContextOpaque(JSContext *ctx)
+{
+    return ctx->opaque;
 }
 
 void JS_SetInterruptHandler(JSContext *ctx, JSInterruptHandler *interrupt_handler)
@@ -5445,8 +5491,8 @@ JSValue JS_Call(JSContext *ctx, int call_flags)
                                     val = JS_EXCEPTION;
                                 } else {
                                     d = fd->func.f_f(d);
+                                    val = JS_NewFloat64(ctx, d);
                                 }
-                                val = JS_NewFloat64(ctx, d);
                             }
                             break;
                         default:
@@ -5586,7 +5632,7 @@ JSValue JS_Call(JSContext *ctx, int call_flags)
                             /* exception caught by a 'catch' in the
                                current function */
                             *--sp = ctx->current_exception;
-                            ctx->current_exception = JS_NULL;
+                            ctx->current_exception = JS_UNINITIALIZED;
                             byte_code = JS_VALUE_TO_PTR(b->byte_code);
                             pc = byte_code->buf + JS_VALUE_GET_SPECIAL_VALUE(val2);
                             goto restart;
@@ -11982,6 +12028,13 @@ static void gc_mark_flush(GCMarkState *s)
                     gc_mark(s, p->u.regexp.source);
                     gc_mark(s, p->u.regexp.byte_code);
                     break;
+                default:
+                    if (p->class_id >= JS_CLASS_USER) {
+                        int i;
+                        for(i = 0; i < p->extra_size - 1; i++) 
+                            gc_mark(s, p->u.user.values[i]);
+                    }
+                    break;
                 }
             }
             break;
@@ -12175,16 +12228,19 @@ static void gc_mark_all(JSContext *ctx, BOOL keep_atoms)
             if (b->gc_mark) {
                 b->gc_mark = 0;
             } else {
-                JSObject *p = (void *)ptr;
-                /* call the user finalizer if needed */
-                if (p->mtag == JS_MTAG_OBJECT && p->class_id >= JS_CLASS_USER &&
-                    ctx->c_finalizer_table[p->class_id - JS_CLASS_USER] != NULL) {
-                    ctx->c_finalizer_table[p->class_id - JS_CLASS_USER](ctx, p->u.user.opaque);
-                }
                 /* merge all the consecutive free blocks */
-                ptr1 = ptr + size;
-                while (ptr1 < ctx->heap_free && ((JSFreeBlock *)ptr1)->gc_mark == 0) {
-                    ptr1 += get_mblock_size(ptr1);
+                ptr1 = ptr;
+                for(;;) {
+                    JSObject *p = (void *)ptr1;
+                    /* call the user finalizer if needed */
+                    if (p->mtag == JS_MTAG_OBJECT && p->class_id >= JS_CLASS_USER &&
+                        ctx->c_finalizer_table[p->class_id - JS_CLASS_USER] != NULL) {
+                        ctx->c_finalizer_table[p->class_id - JS_CLASS_USER](ctx, p->u.user.opaque);
+                    }
+                    ptr1 += size;
+                    if (ptr1 >= ctx->heap_free || ((JSFreeBlock *)ptr1)->gc_mark != 0)
+                        break;
+                    size = get_mblock_size(ptr1);
                 }
                 size = ptr1 - ptr;
                 set_free_block(b, size);
@@ -12289,6 +12345,13 @@ static void gc_thread_block(JSContext *ctx, void *ptr)
             case JS_CLASS_REGEXP:
                 gc_thread_pointer(ctx, &p->u.regexp.source);
                 gc_thread_pointer(ctx, &p->u.regexp.byte_code);
+                break;
+            default:
+                if (p->class_id >= JS_CLASS_USER) {
+                    int i;
+                    for(i = 0; i < p->extra_size - 1; i++)
+                        gc_thread_pointer(ctx, &p->u.user.values[i]);
+                }
                 break;
             }
         }
@@ -14323,12 +14386,17 @@ JSValue js_array_toString(JSContext *ctx, JSValue *this_val,
     return js_array_join(ctx, this_val, 0, NULL);
 }
 
+BOOL JS_IsArray(JSContext *ctx, JSValue obj)
+{
+    JSObject *p;
+    p = js_get_object_class(ctx, obj, JS_CLASS_ARRAY);
+    return (p != NULL);
+}
+
 JSValue js_array_isArray(JSContext *ctx, JSValue *this_val,
                          int argc, JSValue *argv)
 {
-    JSObject *p;
-    p = js_get_object_class(ctx, argv[0], JS_CLASS_ARRAY);
-    return JS_NewBool(p != NULL);
+    return JS_NewBool(JS_IsArray(ctx, argv[0]));
 }
 
 JSValue js_array_reverse(JSContext *ctx, JSValue *this_val,
@@ -15396,10 +15464,28 @@ JSValue js_typed_array_set(JSContext *ctx, JSValue *this_val,
 
 /* Date */
 
-JSValue js_date_constructor(JSContext *ctx, JSValue *this_val,
-                            int argc, JSValue *argv)
+JSValue JS_NewDate(JSContext *ctx, double epoch_ms)
 {
-    return JS_ThrowTypeError(ctx, "only Date.now() is supported");
+    JSValue obj;
+    JSObject *p;
+    obj = JS_NewObjectClass(ctx, JS_CLASS_DATE, sizeof(JSDate));
+    if (JS_IsException(obj))
+        return obj;
+    p = JS_VALUE_TO_PTR(obj);
+    p->u.date.dval = epoch_ms;
+    return obj;
+}
+
+JSValue js_date_valueOf(JSContext *ctx, JSValue *this_val,
+                        int argc, JSValue *argv)
+{
+    JSObject *p;
+    p = js_get_object_class(ctx, *this_val, JS_CLASS_DATE);
+    if (!p) {
+        JS_ThrowTypeError(ctx, "not a Date object");
+        return JS_EXCEPTION;
+    }
+    return __JS_NewFloat64(ctx, p->u.date.dval);
 }
 
 /* global */

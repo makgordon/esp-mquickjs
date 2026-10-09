@@ -237,8 +237,8 @@ JSValue js_typed_array_subarray(JSContext *ctx, JSValue *this_val,
 JSValue js_typed_array_set(JSContext *ctx, JSValue *this_val,
                            int argc, JSValue *argv);
 
-JSValue js_date_constructor(JSContext *ctx, JSValue *this_val,
-                            int argc, JSValue *argv);
+JSValue js_date_valueOf(JSContext *ctx, JSValue *this_val,
+                        int argc, JSValue *argv);
 
 JSValue js_global_eval(JSContext *ctx, JSValue *this_val,
                        int argc, JSValue *argv);

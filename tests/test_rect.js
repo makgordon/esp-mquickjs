@@ -39,14 +39,9 @@ function assert(actual, expected, message) {
                 (message ? " (" + message + ")" : ""));
 }
 
-function cb(param)
+function test_rect()
 {
-    return "test" + param;
-}
-
-function test()
-{
-    var r1, r2, func;
+    var r1, r2;
     r1 = new Rectangle(100, 200);
     assert(r1.x, 100);
     assert(r1.y, 200);
@@ -56,13 +51,36 @@ function test()
     assert(r2.x, 100);
     assert(r2.y, 200);
     assert(r2.color, 0x123456);
-    
+}
+
+function cb(param)
+{
+    return "test" + param;
+}
+
+function test_obj()
+{
+    var func, obj, v;
+
     /* test closure */
-    func = Rectangle.getClosure("abcd");
+    func = TestObject.getClosure("abcd");
     assert(func(), "abcd");
 
     /* test function call */
-    assert(Rectangle.call(cb, "abc"), "testabc");
+    assert(TestObject.call(cb, "abc"), "testabc");
+
+    /* test field access */
+    v = { a: 123 };
+    obj = new TestObject(v);
+    assert(obj.value, v)
+
+    obj.value = "abcd";
+    assert(obj.value, "abcd")
+
+    assert(obj.x, 0)
+    obj.x = 100;
+    assert(obj.x, 100)
 }
 
-test();
+test_rect();
+test_obj();

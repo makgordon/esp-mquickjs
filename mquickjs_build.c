@@ -547,6 +547,10 @@ static int define_props(BuildContext *s, const JSPropDef *props_def,
             prop_type = "GETSET";
             goto value_ptr;
         case JS_DEF_CLASS:
+            if (!is_global_object) {
+                fprintf(stderr, "class definition only allowed in global object\n");
+                exit(1);
+            }
         value_ptr:
             assert(ident_tab[i] >= 0);
             printf("JS_ROM_VALUE(%d),", ident_tab[i]);

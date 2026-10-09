@@ -308,8 +308,13 @@ static const JSPropDef js_date[] = {
     JS_PROP_END,
 };
 
+static const JSPropDef js_date_proto[] = {
+    JS_CFUNC_DEF("valueOf", 0, js_date_valueOf),
+    JS_PROP_END,
+};
+
 static const JSClassDef js_date_class =
-    JS_CLASS_DEF("Date", 7, js_date_constructor, JS_CLASS_DATE, js_date, NULL, NULL, NULL);
+    JS_CLASS_DEF("Date", 7, js_date_constructor, JS_CLASS_DATE, js_date, js_date_proto, NULL, NULL);
 
 static const JSPropDef js_console[] = {
     JS_CFUNC_DEF("log", 1, js_print),
@@ -376,6 +381,7 @@ static const JSPropDef js_global_object[] = {
 #ifdef CONFIG_CLASS_EXAMPLE
     JS_PROP_CLASS_DEF("Rectangle", &js_rectangle_class),
     JS_PROP_CLASS_DEF("FilledRectangle", &js_filled_rectangle_class),
+    JS_PROP_CLASS_DEF("TestObject", &js_test_object_class),
 #else
     JS_CFUNC_DEF("gc", 0, js_gc),
     JS_CFUNC_DEF("load", 1, js_load),
@@ -391,7 +397,7 @@ static const JSPropDef js_c_function_decl[] = {
     /* must come first if "bind" is defined */
     JS_CFUNC_SPECIAL_DEF("bound", 0, generic_params, js_function_bound ),
 #ifdef CONFIG_CLASS_EXAMPLE
-    JS_CFUNC_SPECIAL_DEF("rectangle_closure_test", 0, generic_params, js_rectangle_closure_test ),
+    JS_CFUNC_SPECIAL_DEF("test_object_closure_test", 0, generic_params, js_test_object_closure_test ),
 #endif
     JS_PROP_END,
 };

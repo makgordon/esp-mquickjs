@@ -40,10 +40,11 @@
 
 #define JS_CLASS_RECTANGLE (JS_CLASS_USER + 0)
 #define JS_CLASS_FILLED_RECTANGLE (JS_CLASS_USER + 1)
+#define JS_CLASS_TEST_OBJECT (JS_CLASS_USER + 2)
 /* total number of classes */
-#define JS_CLASS_COUNT (JS_CLASS_USER + 2)
+#define JS_CLASS_COUNT (JS_CLASS_USER + 3)
 
-#define JS_CFUNCTION_rectangle_closure_test (JS_CFUNCTION_USER + 0)
+#define JS_CFUNCTION_test_object_closure_test (JS_CFUNCTION_USER + 0)
 
 typedef struct {
     int x;
@@ -58,20 +59,25 @@ typedef struct {
 static JSValue js_rectangle_constructor(JSContext *ctx, JSValue *this_val, int argc,
                                         JSValue *argv)
 {
-    JSValue obj;
+    JSGCRef obj_ref;
+    JSValue *obj;
     RectangleData *d;
 
     if (!(argc & FRAME_CF_CTOR))
         return JS_ThrowTypeError(ctx, "must be called with new");
+    obj = JS_PushGCRef(ctx, &obj_ref);
     argc &= ~FRAME_CF_CTOR;
-    obj = JS_NewObjectClassUser(ctx, JS_CLASS_RECTANGLE);
-    d = malloc(sizeof(*d));
-    JS_SetOpaque(ctx, obj, d);
-    if (JS_ToInt32(ctx, &d->x, argv[0]))
-        return JS_EXCEPTION;
-    if (JS_ToInt32(ctx, &d->y, argv[1]))
-        return JS_EXCEPTION;
-    return obj;
+    *obj = JS_NewObjectClassUser(ctx, JS_CLASS_RECTANGLE, 0);
+    if (!JS_IsException(*obj)) {
+        d = malloc(sizeof(*d));
+        JS_SetOpaque(ctx, *obj, d);
+        if (JS_ToInt32(ctx, &d->x, argv[0]))
+            return JS_EXCEPTION;
+        if (JS_ToInt32(ctx, &d->y, argv[1]))
+            return JS_EXCEPTION;
+    }
+    JS_PopGCRef(ctx, &obj_ref);
+    return *obj;
 }
 
 static void js_rectangle_finalizer(JSContext *ctx, void *opaque)
@@ -102,31 +108,6 @@ static JSValue js_rectangle_get_y(JSContext *ctx, JSValue *this_val, int argc,
     return JS_NewInt32(ctx, d->y);
 }
 
-static JSValue js_rectangle_closure_test(JSContext *ctx, JSValue *this_val, int argc,
-                                         JSValue *argv, JSValue params)
-{
-    return params;
-}
-
-/* C closure test */
-static JSValue js_rectangle_getClosure(JSContext *ctx, JSValue *this_val, int argc,
-                                    JSValue *argv)
-{
-    return JS_NewCFunctionParams(ctx, JS_CFUNCTION_rectangle_closure_test, argv[0]);
-}
-
-/* example to call a JS function. parameters: function to call, parameter */
-static JSValue js_rectangle_call(JSContext *ctx, JSValue *this_val, int argc,
-                                 JSValue *argv)
-{
-    if (JS_StackCheck(ctx, 3))
-        return JS_EXCEPTION;
-    JS_PushArg(ctx, argv[1]); /* parameter */
-    JS_PushArg(ctx, argv[0]); /* func name */
-    JS_PushArg(ctx, JS_NULL); /* this */
-    return JS_Call(ctx, 1); /* single parameter */
-}
-
 static JSValue js_filled_rectangle_constructor(JSContext *ctx, JSValue *this_val, int argc,
                                                JSValue *argv)
 {
@@ -137,17 +118,18 @@ static JSValue js_filled_rectangle_constructor(JSContext *ctx, JSValue *this_val
     if (!(argc & FRAME_CF_CTOR))
         return JS_ThrowTypeError(ctx, "must be called with new");
     obj = JS_PushGCRef(ctx, &obj_ref);
-    
     argc &= ~FRAME_CF_CTOR;
-    *obj = JS_NewObjectClassUser(ctx, JS_CLASS_FILLED_RECTANGLE);
-    d = malloc(sizeof(*d));
-    JS_SetOpaque(ctx, *obj, d);
-    if (JS_ToInt32(ctx, &d->parent.x, argv[0]))
-        return JS_EXCEPTION;
-    if (JS_ToInt32(ctx, &d->parent.y, argv[1]))
-        return JS_EXCEPTION;
-    if (JS_ToInt32(ctx, &d->color, argv[2]))
-        return JS_EXCEPTION;
+    *obj = JS_NewObjectClassUser(ctx, JS_CLASS_FILLED_RECTANGLE, 0);
+    if (!JS_IsException(*obj)) {
+        d = malloc(sizeof(*d));
+        JS_SetOpaque(ctx, *obj, d);
+        if (JS_ToInt32(ctx, &d->parent.x, argv[0]))
+            return JS_EXCEPTION;
+        if (JS_ToInt32(ctx, &d->parent.y, argv[1]))
+            return JS_EXCEPTION;
+        if (JS_ToInt32(ctx, &d->color, argv[2]))
+            return JS_EXCEPTION;
+    }
     JS_PopGCRef(ctx, &obj_ref);
     return *obj;
 }
@@ -167,6 +149,111 @@ static JSValue js_filled_rectangle_get_color(JSContext *ctx, JSValue *this_val, 
     d = JS_GetOpaque(ctx, *this_val);
     return JS_NewInt32(ctx, d->color);
 }
+
+/* C object test */
+
+typedef struct {
+    int x;
+} TestObjectData;
+
+static JSValue js_test_object_constructor(JSContext *ctx, JSValue *this_val, int argc,
+                                     JSValue *argv)
+{
+    JSGCRef obj_ref;
+    JSValue *obj;
+    TestObjectData *d;
+    
+    if (!(argc & FRAME_CF_CTOR))
+        return JS_ThrowTypeError(ctx, "must be called with new");
+    obj = JS_PushGCRef(ctx, &obj_ref);
+    argc &= ~FRAME_CF_CTOR;
+    *obj = JS_NewObjectClassUser(ctx, JS_CLASS_TEST_OBJECT, 1); /* single value stored in the object */
+    if (!JS_IsException(*obj)) {
+        JS_SetUserValue(ctx, *obj, 0, argv[0]);
+        d = malloc(sizeof(*d));
+        d->x = 0;
+        JS_SetOpaque(ctx, *obj, d);
+    }
+    JS_PopGCRef(ctx, &obj_ref);
+    return *obj;
+}
+
+static void js_test_object_finalizer(JSContext *ctx, void *opaque)
+{
+    TestObjectData *d = opaque;
+    /* warning: cannot access to the user values in the finalizer */
+    free(d);
+}
+
+static JSValue js_test_object_get_value(JSContext *ctx, JSValue *this_val, int argc,
+                                   JSValue *argv)
+{
+    int class_id = JS_GetClassID(ctx, *this_val);
+    if (class_id != JS_CLASS_TEST_OBJECT)
+        return JS_ThrowTypeError(ctx, "expecting TestObject class");
+    return JS_GetUserValue(ctx, *this_val, 0);
+}
+
+static JSValue js_test_object_set_value(JSContext *ctx, JSValue *this_val, int argc,
+                                   JSValue *argv)
+{
+    int class_id = JS_GetClassID(ctx, *this_val);
+    if (class_id != JS_CLASS_TEST_OBJECT)
+        return JS_ThrowTypeError(ctx, "expecting TestObject class");
+    JS_SetUserValue(ctx, *this_val, 0, argv[0]);
+    return JS_UNDEFINED;
+}
+
+static JSValue js_test_object_get_x(JSContext *ctx, JSValue *this_val, int argc,
+                               JSValue *argv)
+{
+    TestObjectData *d;
+    int class_id = JS_GetClassID(ctx, *this_val);
+    if (class_id != JS_CLASS_TEST_OBJECT)
+        return JS_ThrowTypeError(ctx, "expecting TestObject class");
+    d = JS_GetOpaque(ctx, *this_val);
+    return JS_NewInt32(ctx, d->x);
+}
+
+static JSValue js_test_object_set_x(JSContext *ctx, JSValue *this_val, int argc,
+                               JSValue *argv)
+{
+    TestObjectData *d;
+    int class_id = JS_GetClassID(ctx, *this_val);
+    if (class_id != JS_CLASS_TEST_OBJECT)
+        return JS_ThrowTypeError(ctx, "expecting TestObject class");
+    d = JS_GetOpaque(ctx, *this_val);
+    if (JS_ToInt32(ctx, &d->x, argv[0]))
+        return JS_EXCEPTION;
+    return JS_UNDEFINED;
+}
+
+static JSValue js_test_object_closure_test(JSContext *ctx, JSValue *this_val, int argc,
+                                         JSValue *argv, JSValue params)
+{
+    return params;
+}
+
+/* C closure test */
+static JSValue js_test_object_getClosure(JSContext *ctx, JSValue *this_val, int argc,
+                                    JSValue *argv)
+{
+    return JS_NewCFunctionParams(ctx, JS_CFUNCTION_test_object_closure_test, argv[0]);
+}
+
+/* example to call a JS function. parameters: function to call, parameter */
+static JSValue js_test_object_call(JSContext *ctx, JSValue *this_val, int argc,
+                                 JSValue *argv)
+{
+    if (JS_StackCheck(ctx, 3))
+        return JS_EXCEPTION;
+    JS_PushArg(ctx, argv[1]); /* parameter */
+    JS_PushArg(ctx, argv[0]); /* func name */
+    JS_PushArg(ctx, JS_NULL); /* this */
+    return JS_Call(ctx, 1); /* single parameter */
+}
+
+/*******/
 
 static JSValue js_print(JSContext *ctx, JSValue *this_val, int argc, JSValue *argv)
 {
@@ -207,11 +294,32 @@ static int64_t get_time_ms(void)
 }
 #endif
 
-static JSValue js_date_now(JSContext *ctx, JSValue *this_val, int argc, JSValue *argv)
+static int64_t get_date_ms(void)
 {
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    return JS_NewInt64(ctx, (int64_t)tv.tv_sec * 1000 + (tv.tv_usec / 1000));
+    return (int64_t)tv.tv_sec * 1000 + (tv.tv_usec / 1000);
+}
+
+JSValue js_date_constructor(JSContext *ctx, JSValue *this_val,
+                            int argc, JSValue *argv)
+{
+    double val;
+    argc &= ~FRAME_CF_CTOR;
+    if (argc == 0) {
+        val = get_date_ms();
+    } else if (argc == 1 && JS_IsNumber(ctx, argv[0])) {
+        if (JS_ToNumber(ctx, &val, argv[0]))
+            return JS_EXCEPTION;
+    } else {
+        return JS_ThrowTypeError(ctx, "unsupported Date() parameter");
+    }
+    return JS_NewDate(ctx, val);
+}
+
+static JSValue js_date_now(JSContext *ctx, JSValue *this_val, int argc, JSValue *argv)
+{
+    return JS_NewInt64(ctx, get_date_ms());
 }
 
 static JSValue js_performance_now(JSContext *ctx, JSValue *this_val, int argc, JSValue *argv)
